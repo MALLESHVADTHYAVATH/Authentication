@@ -2,15 +2,11 @@ const express = require('express')
 const {open} = require('sqlite')
 const sqlite3 = require('sqlite3')
 const path = require('path')
-
+const bcrypt = require('bcrypt')
 const databasePath = path.join(__dirname, 'userData.db')
-
 const app = express()
-
 app.use(express.json())
-
 let database = null
-
 const initializeDbAndServer = async () => {
   try {
     database = await open({
@@ -56,7 +52,8 @@ app.post('/register', async (request, response) => {
       response.send('Password is too short')
     } else {
       /*If password length is greater than 5 then this block will execute*/
-      let newUserDetails = await database.run(postNewUserQuery) //Updating data to the database
+      const newUserDetails = await database.run(postNewUserQuery) //Updating data to the database
+      newUserDetails.lastID
       response.status(200)
       response.send('User created successfully')
     }
@@ -78,51 +75,57 @@ app.post('/login', async (request, response) => {
   if (userData === undefined) {
     //checks the condition if user is already exists or not in the database
     /*If userData is not present in the database then this condition executes*/
-    response.status(400);
-    response.send("Invalid user");
+    response.status(400)
+    response.send('Invalid user')
   } else {
-      /*If password length is greater than 5 then this block will execute*/
-      const isPasswordMatched=await bcrypt.compare(password,userData.password);
-      if(isPasswordMatched===true){
-        response.status(200);
-        response.send("Login success!");
-      }else{
-        response.status(400);
-        response.send("Invalid password");
-      }
+    /*If password length is greater than 5 then this block will execute*/
+    const isPasswordMatched = await bcrypt.compare(password, userData.password)
+    if (isPasswordMatched === true) {
+      response.status(200)
+      response.send('Login success!')
+    } else {
+      response.status(400)
+      response.send('Invalid password')
+    }
   }
 })
 
-app.put("/change-password", async (request, response) {
-  const { username, oldPassword, newPassword }= request.body;
-  const checkForUserQuery =`
-    select * from user where username = "${username}"; `;
-  const dbUser = await database.get(checkForUserQuery);
+app.put('/change-password', async (request, response) => {
+  const {username, oldPassword, newPassword} = request.body
+  const checkForUserQuery = `
+    select * from user where username = "${username}"; `
+  const dbUser = await database.get(checkForUserQuery)
   //First we have to know whether the user exists in the database or not
-  if(dbUser===undefined){ // user not registered 
-    response.status(400);
-    response.send("User not registered");
-  }else {//check for password
-   const isValidPassword = await bcrypt.compare(oldPassword, dbUser.password); 
-   if (isValidPassword === true) { //check length of new password
-      const lengthOfNewPassword = newPassword.length;
-      if (lengthOfNewPassword < 5) { //password is too short response.status(400); response.send("Password is too short");git remote add origin 
+  if (dbUser === undefined) {
+    // user not registered
+    response.status(400)
+    response.send('User not registered')
+  } else {
+    //check for password
+    const isValidPassword = await bcrypt.compare(oldPassword, dbUser.password)
+    if (isValidPassword === true) {
+      //check length of new password
+      const lengthOfNewPassword = newPassword.length
+      if (lengthOfNewPassword < 5) {
+        //password is too short response.status(400); response.send("Password is too short");git remote add origin
         response.status(400)
-        response.send("Password is too short");
-      }else { //update password
-          const encryptedPassword = await bcrypt.hash(newPassword, 18);
-          const updatePasswordQuery =`
+        response.send('Password is too short')
+      } else {
+        //update password
+        const encryptedPassword = await bcrypt.hash(newPassword, 10)
+        const updatePasswordQuery = `
           update user
           set password= '${encryptedPassword}'
-          where username = '${username}'`;
-          await db.run(updatePasswordQuery); 
-          response.send("Password updated");
+          where username = '${username}'`
+        await database.run(updatePasswordQuery)
+        response.send('Password updated')
       }
-    }else {  //invalid password 
-        response.status(400); 
-        response.send("Invalid current password");
-    } 
-  } 
-});
+    } else {
+      //invalid password.
+      response.status(400)
+      response.send('Invalid current password')
+    }
+  }
+})
 
 module.exports = app
